@@ -27,8 +27,10 @@ system.
   seasonal deviation, persistence, and a data-completeness penalty.
 - **High-performance maps** via deck.gl (point, H3-hex, selected-site layers).
 - **Fast backend:** partitioned Parquet + precomputed DuckDB summary tables.
-- **Deployable:** Docker-based Hugging Face Space; small bundled sample for an
-  instant demo; reproducible full-mode rebuild.
+- **National coverage:** all 50 states + DC (~24,500 USGS sites, ~24.7M daily
+  observations, 2021–present) bundled for an instant demo.
+- **Deployable:** Docker-based Hugging Face Space; reproducible rebuild from
+  partitioned Parquet; deeper multi-decade history via full mode.
 
 ## Tech
 

@@ -112,15 +112,22 @@ Open the printed URL. The app starts in **demo mode** using the bundled sample.
 ## Fetching data
 
 ```bash
-# Rebuild the small demo sample from USGS (a few minutes):
-python scripts/fetch_demo_data.py --states RI MA CO CA --params 00060 00065 --years 5
+# Quick subset for local iteration (a few minutes):
+python scripts/fetch_demo_data.py --states RI MA CO CA --params 00060 00065 --years 2
 python scripts/build_database.py
 
-# Build a larger local dataset (full mode):
+# Rebuild the full national bundled dataset (all 51 states, ~30 min):
+python scripts/fetch_demo_data.py \
+  --states AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO \
+           MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC \
+  --params 00060 00065 --years 6
+python scripts/build_database.py
+
+# Build a deeper multi-decade dataset (full mode):
 export RIVERS_DATA_MODE=full
 export RIVERS_DATA_DIR=data/full
 python scripts/fetch_sites_all_states.py
-python scripts/fetch_daily_partitioned.py --states CA CO TX --start 2015 --end 2024
+python scripts/fetch_daily_partitioned.py --states CA CO TX --start 2000 --end 2024
 python scripts/update_latest.py --states CA CO TX
 python scripts/build_database.py
 ```
@@ -168,7 +175,8 @@ secret and an `HF_SPACE` variable. See [`docs/deployment.md`](docs/deployment.md
 - USGS values are **provisional** until reviewed and may be revised.
 - Coverage varies widely by state, parameter, and era; gaps are common.
 - The anomaly score is a **heuristic** for exploration, not a calibrated alert.
-- The bundled sample covers four states; the pipeline scales to all of them.
+- The bundled dataset covers all 50 states + DC (~24,500 sites, 2021–present);
+  deeper multi-decade history is available via full mode.
 
 ## Roadmap
 
