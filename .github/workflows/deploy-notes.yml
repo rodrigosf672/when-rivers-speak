@@ -1,0 +1,71 @@
+name: Validate app and mirror to Hugging Face Space
+
+# Two jobs:
+#   validate  — on every push/PR: install the package, sanity-check the marimo
+#               notebook parses and the demo DB builds. Fast confidence signal.
+#   deploy    — on push to main: optionally mirror the repo to a Hugging Face
+#               Space so the live app redeploys. Requires an HF_TOKEN secret and
+#               the HF_SPACE variable; skipped automatically if unset.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install package
+        run: pip install -e .
+      - name: Check imports and notebook parse
+        env:
+          RIVERS_DATA_MODE: demo
+          RIVERS_DATA_DIR: data/sample
+          PYTHONPATH: .
+        run: |
+          python -c "import rivers, app; print('imports OK')"
+          python -c "import ast; ast.parse(open('app.py').read()); print('app.py parses')"
+      - name: Build demo database
+        env:
+          RIVERS_DATA_MODE: demo
+          RIVERS_DATA_DIR: data/sample
+        run: python scripts/build_database.py
+
+  deploy:
+    needs: validate
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Mirror to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ vars.HF_SPACE }}   # e.g. "your-username/when-rivers-speak"
+        run: |
+          if [ -z "$HF_TOKEN" ] || [ -z "$HF_SPACE" ]; then
+            echo "HF_TOKEN or HF_SPACE not set — skipping Space deploy."
+            exit 0
+          fi
+          pip install "huggingface_hub>=0.24"
+          python - <<'PY'
+          import os
+          from huggingface_hub import HfApi
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          space = os.environ["HF_SPACE"]
+          api.upload_folder(
+              folder_path=".",
+              repo_id=space,
+              repo_type="space",
+              ignore_patterns=[".git*", "data/full/*", "*.duckdb", ".cache/*"],
+          )
+          print(f"Deployed to https://huggingface.co/spaces/{space}")
+          PY

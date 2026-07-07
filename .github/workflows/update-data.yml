@@ -1,0 +1,53 @@
+name: Update latest river data
+
+# Refreshes the "latest observations" slice of the demo dataset on a schedule
+# and rebuilds the DuckDB. Runs are lightweight (a few small USGS requests).
+# Large historical pulls are NOT run here — see docs/deployment.md.
+
+on:
+  schedule:
+    # Every 6 hours, on the hour (UTC).
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      states:
+        description: "Space-separated state codes"
+        default: "RI MA CO CA"
+
+permissions:
+  contents: write
+
+jobs:
+  update-latest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install package
+        run: pip install -e .
+
+      - name: Refresh latest observations
+        env:
+          RIVERS_DATA_MODE: demo
+          RIVERS_DATA_DIR: data/sample
+        run: |
+          python scripts/update_latest.py --states ${{ github.event.inputs.states || 'RI MA CO CA' }}
+
+      - name: Commit refreshed sample (if changed)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Only the small latest Parquet partitions; never commit the DuckDB
+          # file or any full-mode data (both are .gitignored).
+          git add data/sample/parquet/latest || true
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "chore: refresh latest river observations [skip ci]"
+            git push
+          fi

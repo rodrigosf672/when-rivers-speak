@@ -1,0 +1,16 @@
+# marimo project configuration for When Rivers Speak.
+# See https://docs.marimo.io/guides/configuration/
+
+[display]
+theme = "light"
+code_editor_font_size = 14
+cell_output = "above"
+default_width = "full"
+
+[runtime]
+# Cells re-run automatically when their inputs change (reactive dataflow).
+auto_instantiate = true
+on_cell_change = "autorun"
+
+[formatting]
+line_length = 100

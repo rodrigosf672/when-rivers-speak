@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "when-rivers-speak"
+version = "0.1.0"
+description = "A national river observatory: interactive exploration of USGS river data across the United States."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "When Rivers Speak contributors" }]
+keywords = ["usgs", "rivers", "hydrology", "marimo", "duckdb", "dashboard", "open-data"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Scientific/Engineering :: Hydrology",
+    "Intended Audience :: Science/Research",
+]
+
+dependencies = [
+    "marimo>=0.9",
+    "duckdb>=1.0",
+    "pyarrow>=15",
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "requests>=2.31",
+    "altair>=5.2",
+    "vl-convert-python>=1.4",
+    "pydeck>=0.9",
+    "h3>=4.0",
+]
+
+[project.optional-dependencies]
+# Optional preprocessing / spatial extras used by the full ingestion pipeline.
+geo = ["geopandas>=0.14", "shapely>=2.0"]
+dev = ["pytest>=8.0", "ruff>=0.5"]
+
+[project.urls]
+Homepage = "https://github.com/OWNER/when-rivers-speak"
+Documentation = "https://github.com/OWNER/when-rivers-speak/tree/main/docs"
+"Live demo" = "https://huggingface.co/spaces/OWNER/when-rivers-speak"
+
+[tool.setuptools]
+packages = ["rivers"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

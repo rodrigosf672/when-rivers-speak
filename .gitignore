@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.env
+
+# Caches
+.cache/
+.river_cache/
+.ruff_cache/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Data: ship only the small bundled sample; never commit large / full datasets.
+data/full/
+*.duckdb
+*.duckdb.wal
+# Keep the sample Parquet + manifest that back demo mode.
+!data/sample/
+!data/sample/**
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
