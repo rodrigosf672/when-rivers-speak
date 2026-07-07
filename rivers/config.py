@@ -110,8 +110,8 @@ def state_name(code: str) -> str:
 # Fetch / networking defaults
 # --------------------------------------------------------------------------- #
 USGS_BASE = "https://waterservices.usgs.gov/nwis"
-HTTP_TIMEOUT = 60            # seconds
-HTTP_MAX_RETRIES = 4
+HTTP_TIMEOUT = 120           # seconds (large states' 15-min IV pulls are big)
+HTTP_MAX_RETRIES = 5
 HTTP_BACKOFF = 1.5          # exponential backoff base (seconds)
 # USGS asks that automated clients identify themselves.
 USER_AGENT = "when-rivers-speak/0.1 (national river observatory; USGS public data)"

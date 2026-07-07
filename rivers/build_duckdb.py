@@ -78,9 +78,19 @@ def _build_base_tables(con, base: Path, *, log) -> None:
     else:
         con.execute("CREATE TABLE latest_values (site_no VARCHAR, parameter VARCHAR, param_code VARCHAR, datetime VARCHAR, value DOUBLE, qualifiers VARCHAR, state VARCHAR)")
 
+    # 15-minute instantaneous values (trailing ~30-day window, ~80M rows) are
+    # NOT materialized into the DB: the Parquet is ~150 MB but the same rows
+    # materialized (string columns + index) balloon to ~2 GB, impractical to
+    # ship. Instead ``connect()`` exposes them as a temporary view over the
+    # hive-partitioned Parquet at open time, pointed at the *current*
+    # PARQUET_DIR — so the shipped DB carries no build-time absolute path and
+    # the view resolves wherever the repo is deployed. Filtering by
+    # parameter/state prunes partitions and keeps detail queries fast.
     for t in ("sites", "daily_values", "latest_values"):
         n = con.execute(f"SELECT count(*) FROM {t}").fetchone()[0]
         log(f"  base {t}: {n} rows")
+    if _has_parquet(base, "instantaneous"):
+        log("  instantaneous_values: exposed as a lazy view at connect() time")
 
 
 # --------------------------------------------------------------------------- #
@@ -233,10 +243,27 @@ def _build_coverage_table(con, *, log) -> None:
     log(f"  coverage data_coverage_summary: {n} rows")
 
 
-def connect(duckdb_path: Path | None = None, read_only: bool = True):
-    """Open a connection to the built database (read-only by default)."""
+def connect(duckdb_path: Path | None = None, read_only: bool = True,
+            parquet_dir: Path | None = None):
+    """Open a connection to the built database (read-only by default).
+
+    If a 15-minute instantaneous Parquet store is present, expose it as a
+    temporary ``instantaneous_values`` view over the hive-partitioned Parquet
+    (see ``_build_base_tables`` for why it is not materialized). The view is
+    session-scoped, so it works on a read-only connection and always points at
+    the current ``parquet_dir``.
+    """
     duckdb_path = duckdb_path or DUCKDB_PATH
-    return duckdb.connect(str(duckdb_path), read_only=read_only)
+    parquet_dir = parquet_dir or PARQUET_DIR
+    con = duckdb.connect(str(duckdb_path), read_only=read_only)
+    if _has_parquet(parquet_dir, "instantaneous"):
+        iv_glob = _glob(parquet_dir, "instantaneous")
+        con.execute(
+            "CREATE OR REPLACE TEMPORARY VIEW instantaneous_values AS "
+            "SELECT *, CAST(datetime AS TIMESTAMP) AS ts "
+            f"FROM read_parquet('{iv_glob}', union_by_name=true, hive_partitioning=true)"
+        )
+    return con
 
 
 # --------------------------------------------------------------------------- #
@@ -311,3 +338,52 @@ def site_list(con, *, parameter: str, states: list[str] | None = None):
         f"""SELECT d.site_no, d.state, s.station_nm, d.n_days, d.first_date, d.last_date
             FROM site_daily_summary d LEFT JOIN sites s ON d.site_no = s.site_no
             WHERE {where} ORDER BY d.state, s.station_nm""", params).df()
+
+
+def site_iv_series(con, *, site_no: str, parameter: str, start=None, end=None):
+    """Trailing-window 15-minute instantaneous series for one site+parameter.
+
+    Returns a datetime-ordered frame (``ts``, ``value``). ``start``/``end`` are
+    optional ISO timestamps to sub-slice the stored ~30-day window.
+    """
+    clauses = ["site_no = ?", "parameter = ?"]
+    params: list = [site_no, parameter]
+    if start:
+        clauses.append("ts >= ?"); params.append(str(start))
+    if end:
+        clauses.append("ts <= ?"); params.append(str(end))
+    where = " AND ".join(clauses)
+    return con.execute(
+        f"SELECT ts, value, qualifiers FROM instantaneous_values "
+        f"WHERE {where} ORDER BY ts", params).df()
+
+
+def iv_site_list(con, *, parameter: str, states: list[str] | None = None):
+    """Sites that have 15-minute data for a parameter (with reading counts)."""
+    clauses = ["iv.parameter = ?"]
+    params: list = [parameter]
+    if states:
+        placeholders = ",".join("?" for _ in states)
+        clauses.append(f"iv.state IN ({placeholders})")
+        params.extend(states)
+    where = " AND ".join(clauses)
+    return con.execute(
+        f"""SELECT iv.site_no, iv.state, s.station_nm,
+                   count(*) AS n_readings,
+                   min(iv.ts) AS first_ts, max(iv.ts) AS last_ts
+            FROM instantaneous_values iv
+            LEFT JOIN sites s ON iv.site_no = s.site_no
+            WHERE {where}
+            GROUP BY iv.site_no, iv.state, s.station_nm
+            ORDER BY n_readings DESC""", params).df()
+
+
+def iv_coverage(con):
+    """Per-parameter 15-minute coverage summary (sites, readings, window)."""
+    return con.execute(
+        """SELECT parameter,
+                  count(DISTINCT site_no) AS n_sites,
+                  count(*) AS n_readings,
+                  min(ts) AS window_start, max(ts) AS window_end
+           FROM instantaneous_values
+           GROUP BY parameter ORDER BY n_readings DESC""").df()

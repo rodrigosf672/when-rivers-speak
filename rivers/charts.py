@@ -123,3 +123,50 @@ def change_ranking(scores: pd.DataFrame, *, direction: str = "rise",
         y=alt.Y("label:N", sort="-x", title="Site"),
         tooltip=["site_no:N", "state:N", alt.Tooltip(f"{col}:Q", format=".2f")],
     ).properties(title=title or f"Top sudden {direction}s", width="container", height=420)
+
+
+def instantaneous_series(iv: pd.DataFrame, *, value_label: str = "value",
+                         title: str = "", normal_low: float | None = None,
+                         normal_high: float | None = None) -> alt.Chart:
+    """High-resolution 15-minute signal for one site+parameter.
+
+    Draws the raw instantaneous readings as a fine line and, when a normal
+    operating range is supplied (e.g. the site's daily p25–p75 for the season),
+    shades it as a reference band — the real-time-monitoring view of a
+    parameter tracked against its normal range.
+
+    Parameters
+    ----------
+    iv
+        Frame with ``ts`` (timestamp) and ``value``.
+    normal_low, normal_high
+        Optional reference-band bounds spanning the full time axis.
+    """
+    d = iv.copy()
+    d["ts"] = pd.to_datetime(d["ts"])
+    layers: list[alt.Chart] = []
+
+    if normal_low is not None and normal_high is not None:
+        band = pd.DataFrame({
+            "ts": [d["ts"].min(), d["ts"].max()],
+            "low": [normal_low, normal_low],
+            "high": [normal_high, normal_high],
+        })
+        layers.append(
+            alt.Chart(band).mark_area(opacity=0.15, color="#2c7fb8").encode(
+                x=alt.X("ts:T", title="Time (last ~30 days, 15-min readings)"),
+                y=alt.Y("low:Q", title=value_label), y2="high:Q",
+            )
+        )
+
+    layers.append(
+        alt.Chart(d).mark_line(color="#253494", strokeWidth=0.8).encode(
+            x=alt.X("ts:T", title="Time (last ~30 days, 15-min readings)"),
+            y=alt.Y("value:Q", title=value_label),
+            tooltip=[alt.Tooltip("ts:T", title="Time"),
+                     alt.Tooltip("value:Q", format=",.2f", title=value_label)],
+        )
+    )
+    return alt.layer(*layers).properties(
+        title=title, width="container", height=340
+    ).interactive()

@@ -52,6 +52,27 @@ Most recent instantaneous reading per site/parameter.
 | value | DOUBLE |
 | qualifiers | VARCHAR |
 
+### `instantaneous_values`
+Trailing ~30-day window of 15-minute instantaneous readings (the high-resolution
+real-time-monitoring layer). Exposed as a **lazy view** over hive-partitioned
+Parquet (`instantaneous/state=XX/parameter=<key>/iv.parquet`) rather than
+materialized into the DB: ~80M rows are ~150 MB as Parquet but would balloon to
+~2 GB materialized. The view is (re)created at `build_duckdb.connect()` time
+against the current data directory, so no build-time path is baked into the
+shipped DB. Filtering by `parameter`/`state` prunes partitions.
+
+| Column | Type |
+|---|---|
+| site_no, parameter, param_code, state | VARCHAR |
+| datetime | VARCHAR (ISO 8601 with offset) |
+| ts | TIMESTAMP (parsed from datetime) |
+| value | DOUBLE |
+| qualifiers | VARCHAR |
+| date | VARCHAR (UTC calendar-date partition key) |
+
+Query helpers: `site_iv_series(con, site_no=, parameter=)`,
+`iv_site_list(con, parameter=, states=)`, `iv_coverage(con)`.
+
 ## Summary tables
 
 | Table | Grain | Key columns |

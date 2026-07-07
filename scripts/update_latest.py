@@ -16,7 +16,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from rivers import build_duckdb, fetch_latest
+from rivers import build_duckdb, fetch_instantaneous, fetch_latest
 from rivers.config import DATA_DIR, MVP_PARAM_CODES
 
 DEFAULT_STATES = ["RI", "MA", "CO", "CA"]
@@ -27,6 +27,10 @@ def main() -> None:
     ap.add_argument("--states", nargs="+", default=DEFAULT_STATES)
     ap.add_argument("--params", nargs="+", default=list(MVP_PARAM_CODES))
     ap.add_argument("--out", default=None)
+    ap.add_argument("--iv-period", default="P30D",
+                    help="trailing 15-minute window to refresh (ISO 8601, e.g. P30D)")
+    ap.add_argument("--no-iv", action="store_true",
+                    help="skip refreshing the 15-minute instantaneous window")
     ap.add_argument("--rebuild", action="store_true", default=True,
                     help="rebuild DuckDB after updating (default: on)")
     args = ap.parse_args()
@@ -38,6 +42,13 @@ def main() -> None:
     df = fetch_latest.fetch_latest(args.states, parameters=args.params,
                                    base=parquet, use_cache=False)
     print(f"[update] latest: {len(df)} rows")
+
+    if not args.no_iv:
+        print(f"[update] refreshing 15-minute window ({args.iv_period}) ...")
+        iv = fetch_instantaneous.fetch_instantaneous(
+            args.states, parameters=args.params, period=args.iv_period,
+            base=parquet, use_cache=False)
+        print(f"[update] instantaneous: {len(iv)} readings")
 
     if args.rebuild:
         build_duckdb.build(parquet_dir=parquet, duckdb_path=base / "rivers.duckdb")

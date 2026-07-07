@@ -42,8 +42,13 @@ flood-prediction system and carries no emergency reliability guarantees.**
 |---|---|
 | ![State ranking](assets/screenshots/chart_state_ranking.png) | ![Anomaly components](assets/screenshots/metrics_validation.png) |
 
+| Live 15-min signal (streamflow) | Live 15-min signal (water temperature) |
+|---|---|
+| ![15-minute discharge](assets/screenshots/chart_15min_signal.png) | ![15-minute water temperature](assets/screenshots/chart_15min_watertemp.png) |
+
 *(Static previews rendered from the bundled sample dataset. The live app maps
-are interactive deck.gl layers.)*
+are interactive deck.gl layers; the 15-minute charts show storm-response spikes
+and diel cycles that daily means smooth away.)*
 
 ## Why this exists
 
@@ -56,7 +61,7 @@ questions are a click away.
 
 ## What the dashboard shows
 
-Six tabs, all driven by shared filters (state, parameter, date range, anomaly
+Seven tabs, all driven by shared filters (state, parameter, date range, anomaly
 threshold, map layer):
 
 1. **National River Pulse** — a U.S. map of latest river conditions colored by
@@ -69,7 +74,11 @@ threshold, map layer):
    ranking.
 5. **Data Coverage Observatory** — site counts, record longevity, and
    completeness by state and parameter.
-6. **About the Data** — sources, the anomaly-score definition, update cadence,
+6. **Live 15-Minute Signal** — the last ~30 days of sub-hourly instantaneous
+   readings for a chosen site, tracked against its seasonal normal range: the
+   real-time-monitoring view where storm-response spikes and diel cycles are
+   visible.
+7. **About the Data** — sources, the anomaly-score definition, update cadence,
    and limitations.
 
 ## Data sources
@@ -79,9 +88,12 @@ All data comes from the **U.S. Geological Survey (USGS) Water Services API**
 services. USGS water data are in the public domain. This project is independent
 and not affiliated with or endorsed by the USGS.
 
-Parameters supported: discharge/streamflow, gage height, water temperature, pH,
-dissolved oxygen, specific conductance, and turbidity. **Discharge** and **gage
-height** are the minimum-viable dataset and back the bundled sample.
+Parameters in the bundled dataset (all nationwide, 2021–present): **discharge /
+streamflow**, **gage height**, **water temperature**, **specific conductance**,
+**dissolved oxygen**, and **pH**. Streamflow and gage height have the densest
+coverage; the four water-quality parameters are reported at progressively fewer
+gauges (water temperature at ~2,300 sites down to pH). Turbidity is registered in
+the pipeline and can be added the same way.
 
 ## Architecture
 
@@ -175,8 +187,8 @@ secret and an `HF_SPACE` variable. See [`docs/deployment.md`](docs/deployment.md
 - USGS values are **provisional** until reviewed and may be revised.
 - Coverage varies widely by state, parameter, and era; gaps are common.
 - The anomaly score is a **heuristic** for exploration, not a calibrated alert.
-- The bundled dataset covers all 50 states + DC (~24,500 sites, 2021–present);
-  deeper multi-decade history is available via full mode.
+- The bundled dataset covers all 50 states + DC (~26,000 sites, six parameters,
+  2021–present); deeper multi-decade history is available via full mode.
 
 ## Roadmap
 

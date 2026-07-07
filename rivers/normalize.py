@@ -33,6 +33,10 @@ DAILY_COLUMNS = [
 LATEST_COLUMNS = [
     "site_no", "parameter", "param_code", "datetime", "value", "qualifiers", "state",
 ]
+INSTANTANEOUS_COLUMNS = [
+    "site_no", "parameter", "param_code", "datetime", "value", "qualifiers",
+    "state", "date",
+]
 
 
 # --------------------------------------------------------------------------- #
@@ -186,5 +190,53 @@ def write_latest(df: pd.DataFrame, base: Path | None = None) -> list[Path]:
         d = _ensure(base / "latest" / f"state={state}" / f"parameter={param}")
         out = d / "latest.parquet"
         part.to_parquet(out, index=False)
+        written.append(out)
+    return written
+
+
+def parse_instantaneous_json(json_text: str, state: str) -> pd.DataFrame:
+    """Parse instantaneous-values JSON keeping *all* 15-minute records.
+
+    Unlike ``parse_latest_json`` (which keeps only the most recent reading per
+    site), this retains the full high-frequency series so a trailing window of
+    15-minute data can be stored for real-time-monitoring views.
+    """
+    rows: list[dict] = []
+    for site_no, param_code, records in _iter_series(json_text):
+        param = PARAM_BY_CODE.get(param_code)
+        pkey = param.key if param else param_code
+        for rec in records:
+            val = pd.to_numeric(rec.get("value"), errors="coerce")
+            dt = rec.get("dateTime")
+            if not dt or pd.isna(val):
+                continue
+            rows.append({
+                "site_no": site_no, "parameter": pkey, "param_code": param_code,
+                "datetime": dt, "value": float(val),
+                "qualifiers": ",".join(rec.get("qualifiers", []) or []),
+                "state": state.upper(),
+            })
+    if not rows:
+        return pd.DataFrame(columns=INSTANTANEOUS_COLUMNS)
+    df = pd.DataFrame(rows)
+    # date partition key (UTC-naive calendar date of the reading)
+    df["date"] = pd.to_datetime(df["datetime"], utc=True, errors="coerce").dt.date.astype(str)
+    return df[INSTANTANEOUS_COLUMNS].reset_index(drop=True)
+
+
+def write_instantaneous(df: pd.DataFrame, base: Path | None = None) -> list[Path]:
+    """Write 15-minute instantaneous values partitioned by state/parameter.
+
+    One Parquet file per state+parameter holds the trailing window; the writer
+    overwrites it so a scheduled refresh replaces the slice atomically.
+    """
+    if df.empty:
+        return []
+    base = base or PARQUET_DIR
+    written: list[Path] = []
+    for (state, param), part in df.groupby(["state", "parameter"]):
+        d = _ensure(base / "instantaneous" / f"state={state}" / f"parameter={param}")
+        out = d / "iv.parquet"
+        part.sort_values("datetime").to_parquet(out, index=False)
         written.append(out)
     return written
