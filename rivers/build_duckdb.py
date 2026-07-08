@@ -68,29 +68,62 @@ def _build_base_tables(con, base: Path, *, log) -> None:
     else:
         con.execute("CREATE TABLE sites (site_no VARCHAR, station_nm VARCHAR, site_tp_cd VARCHAR, latitude DOUBLE, longitude DOUBLE, coord_acy_cd VARCHAR, datum VARCHAR, altitude DOUBLE, huc_cd VARCHAR, state VARCHAR)")
 
-    if _has_parquet(base, "daily"):
-        con.execute(f"CREATE TABLE daily_values AS SELECT *, CAST(date AS DATE) AS date_d FROM read_parquet('{_glob(base, 'daily')}', union_by_name=true)")
-    else:
-        con.execute("CREATE TABLE daily_values (site_no VARCHAR, parameter VARCHAR, param_code VARCHAR, date VARCHAR, value DOUBLE, qualifiers VARCHAR, state VARCHAR, year BIGINT, date_d DATE)")
-
+    # daily_values (~30M rows) and instantaneous_values (~80M rows) are NOT
+    # materialized into the DB — they would dominate its size (daily alone is
+    # ~340 MB materialized vs ~75 MB as Parquet; IV would add ~2 GB). Both are
+    # exposed as lazy views over their hive-partitioned Parquet, created by
+    # ``_attach_lazy_views`` at build time (so the summary/climatology/anomaly
+    # tables can be computed from them) and again at ``connect()`` time (so the
+    # shipped DB carries no build-time path and the views resolve wherever the
+    # repo is deployed). Only the small base tables (sites, latest_values) and
+    # the precomputed summary tables are materialized — keeping the DB compact.
     if _has_parquet(base, "latest"):
         con.execute(f"CREATE TABLE latest_values AS SELECT * FROM read_parquet('{_glob(base, 'latest')}', union_by_name=true)")
     else:
         con.execute("CREATE TABLE latest_values (site_no VARCHAR, parameter VARCHAR, param_code VARCHAR, datetime VARCHAR, value DOUBLE, qualifiers VARCHAR, state VARCHAR)")
 
-    # 15-minute instantaneous values (trailing ~30-day window, ~80M rows) are
-    # NOT materialized into the DB: the Parquet is ~150 MB but the same rows
-    # materialized (string columns + index) balloon to ~2 GB, impractical to
-    # ship. Instead ``connect()`` exposes them as a temporary view over the
-    # hive-partitioned Parquet at open time, pointed at the *current*
-    # PARQUET_DIR — so the shipped DB carries no build-time absolute path and
-    # the view resolves wherever the repo is deployed. Filtering by
-    # parameter/state prunes partitions and keeps detail queries fast.
-    for t in ("sites", "daily_values", "latest_values"):
+    _attach_lazy_views(con, base)
+
+    for t in ("sites", "latest_values"):
         n = con.execute(f"SELECT count(*) FROM {t}").fetchone()[0]
         log(f"  base {t}: {n} rows")
+    if _has_parquet(base, "daily"):
+        n = con.execute("SELECT count(*) FROM daily_values").fetchone()[0]
+        log(f"  daily_values (lazy view): {n} rows")
     if _has_parquet(base, "instantaneous"):
-        log("  instantaneous_values: exposed as a lazy view at connect() time")
+        log("  instantaneous_values: lazy view over Parquet")
+
+
+def _attach_lazy_views(con, base: Path) -> None:
+    """(Re)create the lazy views over large partitioned Parquet tables.
+
+    Called at build time and at ``connect()`` time. Uses TEMPORARY views so it
+    works on a read-only connection and always targets the current data
+    directory. Falls back to empty typed tables when the Parquet is absent.
+    """
+    if _has_parquet(base, "daily"):
+        con.execute(
+            "CREATE OR REPLACE TEMPORARY VIEW daily_values AS "
+            "SELECT *, CAST(date AS DATE) AS date_d "
+            f"FROM read_parquet('{_glob(base, 'daily')}', union_by_name=true, hive_partitioning=true)"
+        )
+    elif not _table_exists(con, "daily_values"):
+        con.execute("CREATE TABLE daily_values (site_no VARCHAR, parameter VARCHAR, param_code VARCHAR, date VARCHAR, value DOUBLE, qualifiers VARCHAR, state VARCHAR, year BIGINT, date_d DATE)")
+
+    if _has_parquet(base, "instantaneous"):
+        con.execute(
+            "CREATE OR REPLACE TEMPORARY VIEW instantaneous_values AS "
+            "SELECT *, CAST(datetime AS TIMESTAMP) AS ts "
+            f"FROM read_parquet('{_glob(base, 'instantaneous')}', union_by_name=true, hive_partitioning=true)"
+        )
+    elif not _table_exists(con, "instantaneous_values"):
+        con.execute("CREATE TABLE instantaneous_values (site_no VARCHAR, parameter VARCHAR, param_code VARCHAR, datetime VARCHAR, value DOUBLE, qualifiers VARCHAR, state VARCHAR, date VARCHAR, ts TIMESTAMP)")
+
+
+def _table_exists(con, name: str) -> bool:
+    return con.execute(
+        "SELECT count(*) FROM information_schema.tables WHERE table_name = ?",
+        [name]).fetchone()[0] > 0
 
 
 # --------------------------------------------------------------------------- #
@@ -247,22 +280,16 @@ def connect(duckdb_path: Path | None = None, read_only: bool = True,
             parquet_dir: Path | None = None):
     """Open a connection to the built database (read-only by default).
 
-    If a 15-minute instantaneous Parquet store is present, expose it as a
-    temporary ``instantaneous_values`` view over the hive-partitioned Parquet
-    (see ``_build_base_tables`` for why it is not materialized). The view is
-    session-scoped, so it works on a read-only connection and always points at
-    the current ``parquet_dir``.
+    The large ``daily_values`` and ``instantaneous_values`` tables are exposed
+    as temporary views over their hive-partitioned Parquet (see
+    ``_build_base_tables`` for why they are not materialized). The views are
+    session-scoped, so they work on a read-only connection and always point at
+    the current ``parquet_dir`` — the shipped DB carries no build-time path.
     """
     duckdb_path = duckdb_path or DUCKDB_PATH
     parquet_dir = parquet_dir or PARQUET_DIR
     con = duckdb.connect(str(duckdb_path), read_only=read_only)
-    if _has_parquet(parquet_dir, "instantaneous"):
-        iv_glob = _glob(parquet_dir, "instantaneous")
-        con.execute(
-            "CREATE OR REPLACE TEMPORARY VIEW instantaneous_values AS "
-            "SELECT *, CAST(datetime AS TIMESTAMP) AS ts "
-            f"FROM read_parquet('{iv_glob}', union_by_name=true, hive_partitioning=true)"
-        )
+    _attach_lazy_views(con, parquet_dir)
     return con
 
 
