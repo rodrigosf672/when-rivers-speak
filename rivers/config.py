@@ -52,18 +52,36 @@ class Parameter:
     unit: str          # display unit
     mvp: bool = False  # part of the minimum-viable dataset
     log_scale: bool = False  # sensible default axis scaling for charts
+    # Physical validity range. Readings outside [valid_min, valid_max] are
+    # treated as missing (dropped at parse time), independent of the USGS
+    # per-series ``noDataValue`` sentinel. Bounds are generous where real
+    # extremes exist (discharge/gage height can be large or, at tidal gauges,
+    # strongly negative) and tight where the physics is hard (pH 0–14).
+    valid_min: float = -1.0e9
+    valid_max: float = 1.0e9
 
 
 # Ordered registry. Discharge and gage height are the MVP parameters; the rest
 # are supported by the fetchers and light up automatically once data exists.
 PARAMETERS: tuple[Parameter, ...] = (
-    Parameter("00060", "discharge", "Discharge / streamflow", "ft3/s", mvp=True, log_scale=True),
-    Parameter("00065", "gage_height", "Gage height", "ft", mvp=True),
-    Parameter("00010", "water_temp", "Water temperature", "degC"),
-    Parameter("00400", "ph", "pH", "std units"),
-    Parameter("00300", "dissolved_oxygen", "Dissolved oxygen", "mg/L"),
-    Parameter("00095", "conductance", "Specific conductance", "uS/cm"),
-    Parameter("63680", "turbidity", "Turbidity", "FNU"),
+    # discharge: can be very large; tidal gauges report real strong negatives
+    # (reverse flow), so the lower bound is generous but excludes the -999999
+    # sentinel and absurd magnitudes.
+    Parameter("00060", "discharge", "Discharge / streamflow", "ft3/s", mvp=True, log_scale=True,
+              valid_min=-900000.0, valid_max=5.0e6),
+    # gage height: stage in feet; small negatives occur at some datums.
+    Parameter("00065", "gage_height", "Gage height", "ft", mvp=True,
+              valid_min=-100.0, valid_max=10000.0),
+    Parameter("00010", "water_temp", "Water temperature", "degC",
+              valid_min=-5.0, valid_max=45.0),
+    Parameter("00400", "ph", "pH", "std units",
+              valid_min=0.0, valid_max=14.0),
+    Parameter("00300", "dissolved_oxygen", "Dissolved oxygen", "mg/L",
+              valid_min=0.0, valid_max=60.0),
+    Parameter("00095", "conductance", "Specific conductance", "uS/cm",
+              valid_min=0.0, valid_max=2.0e6),
+    Parameter("63680", "turbidity", "Turbidity", "FNU",
+              valid_min=0.0, valid_max=5000.0),
 )
 
 PARAM_BY_CODE = {p.code: p for p in PARAMETERS}

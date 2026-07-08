@@ -501,6 +501,11 @@ def _tab_about(mo, mode_badge):
         - Provisional data may be revised by USGS after review.
         - Coverage varies widely by state, parameter, and era.
         - Gaps, sensor drift, and datum changes are not fully corrected.
+        - Missing readings (USGS marks these with a `-999999` sentinel) and
+          physically-impossible values (e.g. pH outside 0–14, water temperature
+          above 45 °C) are dropped during ingest, so they do not distort
+          statistics or anomaly scores. Real extremes — including strong
+          negative discharge at tidal gauges (reverse flow) — are preserved.
         - The anomaly score is heuristic and exploratory.
 
         **This is not** a flood-prediction system, an emergency alerting service,

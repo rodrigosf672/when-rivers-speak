@@ -77,7 +77,13 @@ def parse_sites_rdb(rdb_text: str, state: str) -> pd.DataFrame:
 # Values (JSON, shared shape between /dv and /iv)
 # --------------------------------------------------------------------------- #
 def _iter_series(json_text: str):
-    """Yield (site_no, param_code, [value-records]) from a WaterML/JSON blob."""
+    """Yield (site_no, param_code, no_data_value, [value-records]) from a blob.
+
+    ``no_data_value`` is the USGS per-series ``variable.noDataValue`` sentinel
+    (commonly ``-999999``) used to mark missing readings; it is authoritative
+    for distinguishing a missing value from a real (possibly large-negative,
+    at tidal gauges) measurement.
+    """
     if not json_text or not json_text.strip():
         return
     doc = json.loads(json_text)
@@ -90,27 +96,47 @@ def _iter_series(json_text: str):
         param_code = vcodes[0].get("value")
         if not site_no or not param_code:
             continue
+        no_data = pd.to_numeric(var.get("noDataValue"), errors="coerce")
         # A series can carry multiple method blocks; concatenate their values.
         records: list[dict] = []
         for block in series.get("values", []):
             records.extend(block.get("value", []))
-        yield site_no, param_code, records
+        yield site_no, param_code, no_data, records
+
+
+def _clean_value(raw, param_code, no_data):
+    """Return a validated float, or ``None`` if the reading is missing/invalid.
+
+    Drops (a) non-numeric values, (b) the USGS per-series ``noDataValue``
+    sentinel, and (c) values outside the parameter's physical validity range
+    (e.g. pH must be 0–14; a 1310 °C water temperature is a bad reading).
+    """
+    val = pd.to_numeric(raw, errors="coerce")
+    if pd.isna(val):
+        return None
+    val = float(val)
+    if no_data is not None and not pd.isna(no_data) and abs(val - float(no_data)) < 1e-6:
+        return None
+    param = PARAM_BY_CODE.get(param_code)
+    if param is not None and not (param.valid_min <= val <= param.valid_max):
+        return None
+    return val
 
 
 def parse_daily_json(json_text: str, state: str) -> pd.DataFrame:
     """Parse daily-values JSON into a long tidy frame (one row per site/day)."""
     rows: list[dict] = []
-    for site_no, param_code, records in _iter_series(json_text):
+    for site_no, param_code, no_data, records in _iter_series(json_text):
         param = PARAM_BY_CODE.get(param_code)
         pkey = param.key if param else param_code
         for rec in records:
-            val = pd.to_numeric(rec.get("value"), errors="coerce")
+            val = _clean_value(rec.get("value"), param_code, no_data)
             dt = str(rec.get("dateTime", ""))[:10]
-            if not dt or pd.isna(val):
+            if not dt or val is None:
                 continue
             rows.append({
                 "site_no": site_no, "parameter": pkey, "param_code": param_code,
-                "date": dt, "value": float(val),
+                "date": dt, "value": val,
                 "qualifiers": ",".join(rec.get("qualifiers", []) or []),
                 "state": state.upper(), "year": int(dt[:4]),
             })
@@ -124,17 +150,17 @@ def parse_daily_json(json_text: str, state: str) -> pd.DataFrame:
 def parse_latest_json(json_text: str, state: str) -> pd.DataFrame:
     """Parse instantaneous-values JSON and keep the most recent row per site."""
     rows: list[dict] = []
-    for site_no, param_code, records in _iter_series(json_text):
+    for site_no, param_code, no_data, records in _iter_series(json_text):
         param = PARAM_BY_CODE.get(param_code)
         pkey = param.key if param else param_code
         best = None
         for rec in records:
-            val = pd.to_numeric(rec.get("value"), errors="coerce")
+            val = _clean_value(rec.get("value"), param_code, no_data)
             dt = rec.get("dateTime")
-            if not dt or pd.isna(val):
+            if not dt or val is None:
                 continue
             if best is None or dt > best[0]:
-                best = (dt, float(val), ",".join(rec.get("qualifiers", []) or []))
+                best = (dt, val, ",".join(rec.get("qualifiers", []) or []))
         if best is not None:
             rows.append({
                 "site_no": site_no, "parameter": pkey, "param_code": param_code,
@@ -202,17 +228,17 @@ def parse_instantaneous_json(json_text: str, state: str) -> pd.DataFrame:
     15-minute data can be stored for real-time-monitoring views.
     """
     rows: list[dict] = []
-    for site_no, param_code, records in _iter_series(json_text):
+    for site_no, param_code, no_data, records in _iter_series(json_text):
         param = PARAM_BY_CODE.get(param_code)
         pkey = param.key if param else param_code
         for rec in records:
-            val = pd.to_numeric(rec.get("value"), errors="coerce")
+            val = _clean_value(rec.get("value"), param_code, no_data)
             dt = rec.get("dateTime")
-            if not dt or pd.isna(val):
+            if not dt or val is None:
                 continue
             rows.append({
                 "site_no": site_no, "parameter": pkey, "param_code": param_code,
-                "datetime": dt, "value": float(val),
+                "datetime": dt, "value": val,
                 "qualifiers": ",".join(rec.get("qualifiers", []) or []),
                 "state": state.upper(),
             })
