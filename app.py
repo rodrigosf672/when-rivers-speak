@@ -380,96 +380,20 @@ def _tab_coverage(alt, charts, con, mo):
 
 
 # =========================================================================== #
-# TAB 6 — Live 15-Minute Signal
-# =========================================================================== #
-@app.cell
-def _iv_site_picker(build_duckdb, con, mo, sel_param, sel_states):
-    iv_sites = build_duckdb.iv_site_list(con, parameter=sel_param, states=sel_states)
-    iv_opts = {
-        f"{r.station_nm or r.site_no} ({r.state}) — {int(r.n_readings):,} readings": r.site_no
-        for r in iv_sites.itertuples()
-    } or {"(no 15-minute data for this selection)": None}
-    iv_site = mo.ui.dropdown(
-        options=iv_opts, value=list(iv_opts.keys())[0],
-        label="Site (15-minute data)", searchable=True,
-    )
-    iv_band = mo.ui.checkbox(value=True, label="Shade seasonal normal range (daily p25–p75)")
-    return iv_band, iv_site, iv_sites
-
-
-@app.cell
-def _tab_iv(build_duckdb, charts, con, config, iv_band, iv_site, metrics,
-            mo, pd, sel_param):
-    mo.md("### 6 · Live 15-Minute Signal")
-    iv_ctl = mo.hstack([iv_site, iv_band], justify="start", gap=1.2, wrap=True)
-    iv_no = iv_site.value
-
-    if not iv_no:
-        iv_out = mo.md(
-            "_No 15-minute data for this state/parameter selection. "
-            "Instantaneous coverage is densest for streamflow and gage height._"
-        )
-    else:
-        ivs = build_duckdb.site_iv_series(con, site_no=iv_no, parameter=sel_param)
-        if ivs.empty:
-            iv_out = mo.md("_No instantaneous readings stored for this site._")
-        else:
-            # Seasonal normal band from the site's daily p25/p75 climatology.
-            nlow = nhigh = None
-            if iv_band.value:
-                clim = build_duckdb.site_climatology_frame(
-                    con, site_no=iv_no, parameter=sel_param)
-                if not clim.empty:
-                    nlow = float(clim["p25"].median())
-                    nhigh = float(clim["p75"].median())
-            iv_plabel = config.resolve_parameter(sel_param).label
-            iv_unit = config.resolve_parameter(sel_param).unit
-            iv_n = len(ivs)
-            iv_span_h = (ivs["ts"].max() - ivs["ts"].min()).total_seconds() / 3600.0
-            iv_cadence = (iv_span_h * 60.0 / iv_n) if iv_n > 1 else float("nan")
-            iv_cards = mo.hstack([
-                mo.stat(f"{iv_n:,}", label="15-min readings", bordered=True),
-                mo.stat(f"{ivs['value'].iloc[-1]:,.2f}", label=f"Latest {iv_plabel.lower()}", bordered=True),
-                mo.stat(f"{ivs['value'].min():,.1f} – {ivs['value'].max():,.1f}",
-                        label="Range (window)", bordered=True),
-                mo.stat(f"~{iv_cadence:.0f} min" if iv_cadence == iv_cadence else "—",
-                        label="Mean cadence", bordered=True),
-            ], justify="start", gap=1)
-            iv_chart = charts.instantaneous_series(
-                ivs, value_label=f"{iv_plabel} ({iv_unit})",
-                title=f"{iv_no} — {iv_plabel}, last ~30 days at 15-minute resolution",
-                normal_low=nlow, normal_high=nhigh,
-            )
-            iv_out = mo.vstack([iv_cards, mo.ui.altair_chart(iv_chart)])
-
-    mo.vstack([
-        mo.md(
-            "High-resolution instantaneous readings (typically every 15 minutes) "
-            "for the last ~30 days, tracked against the gauge's seasonal normal "
-            "range — a real-time-monitoring view of each parameter."
-        ),
-        iv_ctl,
-        iv_out,
-    ])
-    return
-
-
-# =========================================================================== #
-# TAB 7 — About the Data
+# TAB 6 — About the Data
 # =========================================================================== #
 @app.cell
 def _tab_about(mo, mode_badge):
     mo.md(
         f"""
-        ### 7 · About the Data
+        ### 6 · About the Data
 
         **Source.** All data comes from the U.S. Geological Survey (USGS) Water
         Services API (`waterservices.usgs.gov`) — the Site, Daily Values, and
         Instantaneous Values services. USGS data are in the public domain.
 
         **What this shows.** Historical daily statistics, the most recent
-        observation per gauge, a trailing ~30-day window of **15-minute
-        instantaneous readings**, and derived metrics (percentiles, day-of-year
+        observation per gauge, and derived metrics (percentiles, day-of-year
         climatology, rolling means, volatility) combined into a composite
         *anomaly score* for exploratory situational awareness.
 
@@ -478,11 +402,8 @@ def _tab_about(mo, mode_badge):
         height have the densest coverage; water-quality parameters are reported
         at progressively fewer gauges.
 
-        **Time resolution.** Daily means span 2021–present (multi-year trends and
-        climatology). The Live 15-Minute Signal tab shows the last ~30 days of
-        sub-hourly instantaneous data — the real-time-monitoring view. Six years
-        of 15-minute data nationwide would be billions of rows, so only the
-        recent high-resolution window is bundled.
+        **Time resolution.** Daily means span 2021–present, supporting multi-year
+        trends and day-of-year climatology.
 
         **Anomaly score.** A blend of five signals, clipped to 0–100:
 

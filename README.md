@@ -42,13 +42,8 @@ flood-prediction system and carries no emergency reliability guarantees.**
 |---|---|
 | ![State ranking](assets/screenshots/chart_state_ranking.png) | ![Anomaly components](assets/screenshots/metrics_validation.png) |
 
-| Live 15-min signal (streamflow) | Live 15-min signal (water temperature) |
-|---|---|
-| ![15-minute discharge](assets/screenshots/chart_15min_signal.png) | ![15-minute water temperature](assets/screenshots/chart_15min_watertemp.png) |
-
 *(Static previews rendered from the bundled sample dataset. The live app maps
-are interactive deck.gl layers; the 15-minute charts show storm-response spikes
-and diel cycles that daily means smooth away.)*
+are interactive deck.gl layers.)*
 
 ## Why this exists
 
@@ -61,7 +56,7 @@ questions are a click away.
 
 ## What the dashboard shows
 
-Seven tabs, all driven by shared filters (state, parameter, date range, anomaly
+Six tabs, all driven by shared filters (state, parameter, date range, anomaly
 threshold, map layer):
 
 1. **National River Pulse** — a U.S. map of latest river conditions colored by
@@ -74,11 +69,7 @@ threshold, map layer):
    ranking.
 5. **Data Coverage Observatory** — site counts, record longevity, and
    completeness by state and parameter.
-6. **Live 15-Minute Signal** — the last ~30 days of sub-hourly instantaneous
-   readings for a chosen site, tracked against its seasonal normal range: the
-   real-time-monitoring view where storm-response spikes and diel cycles are
-   visible.
-7. **About the Data** — sources, the anomaly-score definition, update cadence,
+6. **About the Data** — sources, the anomaly-score definition, update cadence,
    and limitations.
 
 ## Data sources
