@@ -41,4 +41,8 @@ RUN if [ -f data/sample/rivers.duckdb ]; then \
 EXPOSE 7860
 
 # marimo run serves the notebook as a read-only app (no code editing exposed).
-CMD ["marimo", "run", "app.py", "--host", "0.0.0.0", "--port", "7860"]
+# --no-token disables session-token auth: the app is public and read-only, and
+# without it an already-open browser tab holds a stale token after the container
+# restarts, causing "Invalid server token" on every widget change (the reactive
+# update is rejected, so the map/results appear frozen).
+CMD ["marimo", "run", "app.py", "--host", "0.0.0.0", "--port", "7860", "--no-token"]

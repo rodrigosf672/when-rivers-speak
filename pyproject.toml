@@ -19,7 +19,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "marimo>=0.9",
+    "marimo>=0.23,<0.24",
     "duckdb>=1.0",
     "pyarrow>=15",
     "pandas>=2.0",
