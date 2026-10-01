@@ -153,6 +153,40 @@ Environment variables:
 | `RIVERS_DATA_DIR`   | `data/sample`  | base dir holding `parquet/` and `rivers.duckdb` |
 | `RIVERS_CACHE_DIR`  | `.cache`       | raw HTTP response cache |
 
+## Studio views: the dashboard and the River Pulse map
+
+`app.py` is served through [marimo-studio](https://marimo-team.github.io/marimo-studio/)
+views of the same notebook:
+
+| URL | View | Source |
+|---|---|---|
+| `/` | **original** — the dashboard above, every displayed cell in order | `studio/original/` |
+| `/pulse/` | **pulse** — a three.js map of every gauged river in the lower 48, Alaska and Hawaii, animated day by day and coloured by flow vs normal | `studio/pulse/` (Svelte) |
+
+```bash
+marimo run app.py        # serves / and /pulse/
+marimo edit app.py       # notebook editor; Studio authoring at /studio/pulse/
+```
+
+The pulse view reads a small "River Pulse" section at the end of `app.py`.
+Its data prep lives in `rivers/pulse/`: terrain, the HydroRIVERS network
+(Hawaii traced from terrain), gauges snapped to reaches, and daily flow codes.
+On first run it downloads about 110 MB of public geography into `.cache/pulse/`
+and derives the map layers into `$RIVERS_DATA_DIR/pulse/` (`data/sample/pulse/`
+in demo mode; both gitignored). Later runs reuse them. The map animates the
+last six calendar years of daily discharge. The sources are HydroRIVERS (North America and Arctic), AWS
+Terrain Tiles, the Census US outline and Natural Earth lakes. To prebuild or
+refresh:
+
+```bash
+python scripts/build_pulse_assets.py [--force]
+```
+
+Studio requires marimo 0.25.0 exactly, so the two are pinned together in
+`pyproject.toml`. Svelte views are built with the Deno that ships with
+`marimo-studio[deno]`. `studio/pulse/AGENTS.md` records how data travels from
+the notebook to the view.
+
 ## Deploying to Hugging Face Spaces
 
 The repo is a ready-to-deploy **Docker Space**.

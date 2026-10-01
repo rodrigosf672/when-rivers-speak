@@ -17,6 +17,7 @@ RUN pip install --upgrade pip && pip install -e .
 
 # App + bundled demo data + scripts + docs/assets.
 COPY app.py .
+COPY studio ./studio
 COPY marimo.toml .
 COPY scripts ./scripts
 COPY data ./data
@@ -37,6 +38,19 @@ RUN if [ -f data/sample/rivers.duckdb ]; then \
     else \
         python scripts/build_database.py || echo "DB build skipped (will build on first run)"; \
     fi
+
+# River Pulse: derive the map layers (downloads ~110 MB of public geography,
+# discarded after the build) and build both Studio views, so the first visitor
+# after a restart does not wait for them.
+RUN python scripts/build_pulse_assets.py && rm -rf .cache/pulse
+RUN marimo-studio view build original --target app.py --profile production && \
+    marimo-studio view build pulse --target app.py --profile production
+
+# Hugging Face runs the container as uid 1000. Studio writes publication locks
+# under studio/ at runtime, and marimo needs a writable HOME for its config.
+RUN useradd -m -u 1000 user && chown -R user:user /app/studio
+USER user
+ENV HOME=/home/user
 
 EXPOSE 7860
 

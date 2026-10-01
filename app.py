@@ -120,7 +120,9 @@ def _controls(mo, param_options, state_options):
 
 @app.cell
 def _tabs(mo):
-    mo.md("## Explore")
+    mo.md("""
+    ## Explore
+    """)
     return
 
 
@@ -170,6 +172,12 @@ def _tab_pulse(charts, controls, layer_select, maps, mo, pulse, sel_param):
     if deck is not None and len(pulse):
         map_view = mo.iframe(deck.to_html(as_string=True, notebook_display=False),
                              height="560px")
+        # Keep the map's file URL on a wrapper as well: Studio views restore the
+        # iframe from it (see studio/original/AGENTS.md).
+        _src = map_view.text.partition("src='")[2].partition("'")[0]
+        if _src.startswith("./@file/"):
+            map_view = mo.Html(f"<div data-iframe-src='{_src}' data-iframe-height='560px'>"
+                               f"{map_view.text}</div>")
     elif deck is not None:
         map_view = mo.md("_No sites match the current filters._")
     else:
@@ -384,61 +392,177 @@ def _tab_coverage(alt, charts, con, mo):
 # =========================================================================== #
 @app.cell
 def _tab_about(mo, mode_badge):
-    mo.md(
-        f"""
-        ### 6 · About the Data
+    mo.md(f"""
+    ### 6 · About the Data
 
-        **Source.** All data comes from the U.S. Geological Survey (USGS) Water
-        Services API (`waterservices.usgs.gov`) — the Site, Daily Values, and
-        Instantaneous Values services. USGS data are in the public domain.
+    **Source.** All data comes from the U.S. Geological Survey (USGS) Water
+    Services API (`waterservices.usgs.gov`) — the Site, Daily Values, and
+    Instantaneous Values services. USGS data are in the public domain.
 
-        **What this shows.** Historical daily statistics, the most recent
-        observation per gauge, and derived metrics (percentiles, day-of-year
-        climatology, rolling means, volatility) combined into a composite
-        *anomaly score* for exploratory situational awareness.
+    **What this shows.** Historical daily statistics, the most recent
+    observation per gauge, and derived metrics (percentiles, day-of-year
+    climatology, rolling means, volatility) combined into a composite
+    *anomaly score* for exploratory situational awareness.
 
-        **Parameters.** Streamflow / discharge, gage height, water temperature,
-        specific conductance, dissolved oxygen, and pH. Streamflow and gage
-        height have the densest coverage; water-quality parameters are reported
-        at progressively fewer gauges.
+    **Parameters.** Streamflow / discharge, gage height, water temperature,
+    specific conductance, dissolved oxygen, and pH. Streamflow and gage
+    height have the densest coverage; water-quality parameters are reported
+    at progressively fewer gauges.
 
-        **Time resolution.** Daily means span 2021–present, supporting multi-year
-        trends and day-of-year climatology.
+    **Time resolution.** Daily means span 2021–present, supporting multi-year
+    trends and day-of-year climatology.
 
-        **Anomaly score.** A blend of five signals, clipped to 0–100:
+    **Anomaly score.** A blend of five signals, clipped to 0–100:
 
-        > `percentile_extremeness + rapid_change + seasonal_deviation
-        >  + persistence − missing_data_penalty`
+    > `percentile_extremeness + rapid_change + seasonal_deviation
+    >  + persistence − missing_data_penalty`
 
-        It flags *unusual* conditions relative to a gauge's own record; it is
-        **not** a calibrated hydrologic forecast.
+    It flags *unusual* conditions relative to a gauge's own record; it is
+    **not** a calibrated hydrologic forecast.
 
-        **Update frequency.** In demo mode the bundled sample is refreshed
-        periodically. The latest-observations slice can be updated on a schedule
-        (see `scripts/update_latest.py` and the GitHub Action).
+    **Update frequency.** In demo mode the bundled sample is refreshed
+    periodically. The latest-observations slice can be updated on a schedule
+    (see `scripts/update_latest.py` and the GitHub Action).
 
-        **Limitations.**
+    **Limitations.**
 
-        - Provisional data may be revised by USGS after review.
-        - Coverage varies widely by state, parameter, and era.
-        - Gaps, sensor drift, and datum changes are not fully corrected.
-        - Missing readings (USGS marks these with a `-999999` sentinel) and
-          physically-impossible values (e.g. pH outside 0–14, water temperature
-          above 45 °C) are dropped during ingest, so they do not distort
-          statistics or anomaly scores. Real extremes — including strong
-          negative discharge at tidal gauges (reverse flow) — are preserved.
-        - The anomaly score is heuristic and exploratory.
+    - Provisional data may be revised by USGS after review.
+    - Coverage varies widely by state, parameter, and era.
+    - Gaps, sensor drift, and datum changes are not fully corrected.
+    - Missing readings (USGS marks these with a `-999999` sentinel) and
+      physically-impossible values (e.g. pH outside 0–14, water temperature
+      above 45 °C) are dropped during ingest, so they do not distort
+      statistics or anomaly scores. Real extremes — including strong
+      negative discharge at tidal gauges (reverse flow) — are preserved.
+    - The anomaly score is heuristic and exploratory.
 
-        **This is not** a flood-prediction system, an emergency alerting service,
-        or a substitute for official NWS/USGS advisories. Current mode:
-        `{mode_badge}`.
+    **This is not** a flood-prediction system, an emergency alerting service,
+    or a substitute for official NWS/USGS advisories. Current mode:
+    `{mode_badge}`.
 
-        **Reproducibility.** Fetch → normalize to partitioned Parquet → build
-        DuckDB summary tables → serve. Rebuild with `scripts/fetch_demo_data.py`
-        and `scripts/build_database.py`. See `docs/architecture.md`.
-        """
-    )
+    **Reproducibility.** Fetch → normalize to partitioned Parquet → build
+    DuckDB summary tables → serve. Rebuild with `scripts/fetch_demo_data.py`
+    and `scripts/build_database.py`. See `docs/architecture.md`.
+    """)
     return
+
+
+# =========================================================================== #
+# River Pulse — data for the Studio "pulse" view (3D animated river map at
+# /pulse/). These cells show nothing in the dashboard except the baseline
+# control, which the view embeds. Studio sends each cell's values in one
+# response of at most 1 MB, so each large payload gets its own cell.
+# =========================================================================== #
+@app.cell
+def _river_pulse_layers(con, mo):
+    from rivers import pulse as river_pulse
+
+    # First run downloads ~110 MB of public geography into .cache/ and derives
+    # the map layers into $RIVERS_DATA_DIR/pulse/; later runs just load them.
+    with mo.status.spinner(title="Preparing River Pulse map layers"):
+        river_pulse_assets = river_pulse.ensure_assets(con)
+    return river_pulse, river_pulse_assets
+
+
+@app.cell
+def _river_pulse_water(river_pulse, river_pulse_assets):
+    river_pulse_water = river_pulse.pack_water(river_pulse_assets)
+    river_pulse_relief_3 = river_pulse.pack_relief_band(river_pulse_assets, 3)
+    return river_pulse_relief_3, river_pulse_water
+
+
+@app.cell
+def _river_pulse_relief_0(river_pulse, river_pulse_assets):
+    river_pulse_relief_0 = river_pulse.pack_relief_band(river_pulse_assets, 0)
+    return (river_pulse_relief_0,)
+
+
+@app.cell
+def _river_pulse_relief_1(river_pulse, river_pulse_assets):
+    river_pulse_relief_1 = river_pulse.pack_relief_band(river_pulse_assets, 1)
+    return (river_pulse_relief_1,)
+
+
+@app.cell
+def _river_pulse_relief_2(river_pulse, river_pulse_assets):
+    river_pulse_relief_2 = river_pulse.pack_relief_band(river_pulse_assets, 2)
+    return (river_pulse_relief_2,)
+
+
+@app.cell
+def _river_pulse_rivers_major(river_pulse, river_pulse_assets):
+    river_pulse_rivers_major = river_pulse.pack_rivers(river_pulse_assets, "major")
+    return (river_pulse_rivers_major,)
+
+
+@app.cell
+def _river_pulse_rivers_minor(river_pulse, river_pulse_assets):
+    river_pulse_rivers_minor = river_pulse.pack_rivers(river_pulse_assets, "minor")
+    return (river_pulse_rivers_minor,)
+
+
+@app.cell
+def _river_pulse_gauges(river_pulse, river_pulse_assets):
+    river_pulse_gauge_points = river_pulse.gauge_points(river_pulse_assets)
+    return (river_pulse_gauge_points,)
+
+
+@app.cell
+def _river_pulse_baseline(mo, river_pulse):
+    river_pulse_baseline = mo.ui.radio(
+        options=river_pulse.BASELINES,
+        value=next(iter(river_pulse.BASELINES)),
+        label="River Pulse: compare each river with",
+    )
+    river_pulse_baseline
+    return (river_pulse_baseline,)
+
+
+@app.cell
+def _river_pulse_flow(con, river_pulse, river_pulse_assets, river_pulse_baseline):
+    river_pulse_discharge = river_pulse.discharge_matrix(con, river_pulse_assets)
+    river_pulse_flow = river_pulse.flow_codes(river_pulse_discharge, river_pulse_baseline.value)
+    river_pulse_map_meta, river_pulse_daily = river_pulse.summary(
+        river_pulse_assets, river_pulse_discharge, river_pulse_flow
+    )
+    return river_pulse_daily, river_pulse_discharge, river_pulse_flow, river_pulse_map_meta
+
+
+# One cell per animated year (river_pulse.YEAR_CELLS of them, oldest first).
+@app.cell
+def _river_pulse_year_0(river_pulse, river_pulse_discharge, river_pulse_flow):
+    river_pulse_year_0 = river_pulse.pack_flow_year(river_pulse_discharge, river_pulse_flow, 0)
+    return (river_pulse_year_0,)
+
+
+@app.cell
+def _river_pulse_year_1(river_pulse, river_pulse_discharge, river_pulse_flow):
+    river_pulse_year_1 = river_pulse.pack_flow_year(river_pulse_discharge, river_pulse_flow, 1)
+    return (river_pulse_year_1,)
+
+
+@app.cell
+def _river_pulse_year_2(river_pulse, river_pulse_discharge, river_pulse_flow):
+    river_pulse_year_2 = river_pulse.pack_flow_year(river_pulse_discharge, river_pulse_flow, 2)
+    return (river_pulse_year_2,)
+
+
+@app.cell
+def _river_pulse_year_3(river_pulse, river_pulse_discharge, river_pulse_flow):
+    river_pulse_year_3 = river_pulse.pack_flow_year(river_pulse_discharge, river_pulse_flow, 3)
+    return (river_pulse_year_3,)
+
+
+@app.cell
+def _river_pulse_year_4(river_pulse, river_pulse_discharge, river_pulse_flow):
+    river_pulse_year_4 = river_pulse.pack_flow_year(river_pulse_discharge, river_pulse_flow, 4)
+    return (river_pulse_year_4,)
+
+
+@app.cell
+def _river_pulse_year_5(river_pulse, river_pulse_discharge, river_pulse_flow):
+    river_pulse_year_5 = river_pulse.pack_flow_year(river_pulse_discharge, river_pulse_flow, 5)
+    return (river_pulse_year_5,)
 
 
 if __name__ == "__main__":

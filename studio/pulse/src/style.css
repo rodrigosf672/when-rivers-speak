@@ -1,0 +1,261 @@
+:root {
+  color-scheme: light;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --mono: "IBM Plex Mono", "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
+  --ink: #26323f;
+  --muted: #5b6878;
+  --rule: #b7c1ce;
+  --accent: #2d5fa6;
+  --panel: rgb(238 241 245 / 0.86);
+  --no-data: #9a948c;
+  --sea: #b2c2d8;
+  font-family: var(--serif);
+  color: var(--ink);
+}
+
+html,
+body,
+#app-shell {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--sea);
+}
+
+.pulse {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.stage {
+  position: absolute;
+  inset: 0;
+}
+
+.stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.panel {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  width: 318px;
+  padding: 18px 20px 16px;
+  border-radius: 6px;
+  background: var(--panel);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 1px 0 rgb(38 50 63 / 0.06);
+  display: grid;
+  gap: 14px;
+}
+
+.panel h1 {
+  margin: 0;
+  font: 600 25px/1.08 var(--serif);
+  letter-spacing: -0.01em;
+}
+
+.kicker,
+.label,
+.note,
+.loading {
+  margin: 0;
+  font: 500 10px/1.45 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.kicker {
+  margin-top: 7px;
+}
+
+.now p {
+  margin: 0;
+}
+
+.date {
+  font: 500 26px/1 var(--mono);
+  letter-spacing: -0.02em;
+  margin-bottom: 12px !important;
+}
+
+.sea {
+  font: 500 22px/1.2 var(--mono);
+  margin-top: 3px !important;
+}
+
+.unit {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.note {
+  margin-top: 4px !important;
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+
+.baseline {
+  --marimo-cell-font: var(--mono);
+  --marimo-cell-foreground: var(--ink);
+  --marimo-cell-accent: var(--accent);
+  --marimo-cell-font-size: 11px;
+  font-size: 11px;
+}
+
+.view-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font: 500 10px/1 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.view-controls label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.view-controls .relief {
+  flex: 1;
+}
+
+.view-controls .relief span {
+  min-width: 70px;
+}
+
+.view-controls input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
+.view-controls input[type="checkbox"] {
+  accent-color: var(--accent);
+  margin: 0;
+}
+
+marimo-cell,
+marimo-output {
+  display: block;
+  min-width: 0;
+}
+
+.bottom {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.bottom > .timeline {
+  padding: 8px 14px 8px 8px;
+  border-radius: 6px;
+  background: var(--panel);
+  backdrop-filter: blur(6px);
+}
+
+.credits {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 2px 14px;
+  font: 9.5px/1.4 var(--mono);
+  color: var(--muted);
+}
+
+.inset-label {
+  position: absolute;
+  transform: translate(6px, 5px);
+  font: 600 10px/1 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink);
+  text-shadow: 0 0 3px rgb(255 255 255 / 0.9), 0 0 6px rgb(255 255 255 / 0.6);
+  pointer-events: none;
+}
+
+.gauge-dot {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  margin: -6px 0 0 -6px;
+  border: 1.5px solid var(--ink);
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.7);
+  pointer-events: none;
+}
+
+.tooltip {
+  position: absolute;
+  transform: translate(12px, -50%);
+  max-width: 260px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  background: rgb(38 50 63 / 0.92);
+  color: #f2f4f7;
+  display: grid;
+  gap: 2px;
+  pointer-events: none;
+  font: 11px/1.35 var(--mono);
+}
+
+.tooltip strong {
+  font: 600 13px/1.25 var(--serif);
+}
+
+.tooltip .reading {
+  font-size: 12px;
+}
+
+.tooltip .detail {
+  color: #b8c2cf;
+  font-size: 10px;
+}
+
+@media (max-width: 720px) {
+  .panel {
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    width: auto;
+    padding: 12px 14px;
+    gap: 10px;
+  }
+  .panel h1 {
+    font-size: 18px;
+  }
+  .kicker {
+    display: none;
+  }
+  .baseline {
+    --marimo-cell-font-size: 10px;
+    font-size: 10px;
+  }
+  .date {
+    font-size: 20px;
+    margin-bottom: 6px !important;
+  }
+  .sea {
+    font-size: 17px;
+  }
+  .bottom {
+    left: 10px;
+    right: 10px;
+    bottom: 8px;
+  }
+  .credits {
+    display: none;
+  }
+}

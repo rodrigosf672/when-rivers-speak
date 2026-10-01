@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>When Rivers Speak</title>
+    <style>
+      body {
+        margin: 0;
+        background: var(--background, Canvas);
+        color: var(--foreground, CanvasText);
+        font-family: var(--text-font, system-ui, sans-serif);
+      }
+
+      #app-shell {
+        box-sizing: border-box;
+        width: 100%;
+        padding: 1.5rem 1rem;
+      }
+
+      @media (min-width: 640px) {
+        #app-shell { padding-inline: 1.5rem; }
+      }
+
+      @media (min-width: 1024px) {
+        #app-shell { padding-inline: 2rem; }
+      }
+
+      .views {
+        display: flex;
+        justify-content: flex-end;
+      }
+
+      .dashboard {
+        display: grid;
+        gap: 1.5rem;
+      }
+
+      .view-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.45rem 0.8rem;
+        border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+        border-radius: 999px;
+        color: inherit;
+        font-size: 0.85rem;
+        text-decoration: none;
+      }
+
+      .view-link:hover {
+        border-color: color-mix(in srgb, currentColor 40%, transparent);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- The original dashboard: every displayed cell of app.py, in notebook order. -->
+    <main id="app-shell">
+      <nav class="views" aria-label="Views">
+        <a class="view-link" href="../pulse/">🌊 Animated 3D river map →</a>
+      </nav>
+      <section class="dashboard" aria-label="When Rivers Speak dashboard">
+        <marimo-cell name="_header"></marimo-cell>
+        <marimo-cell name="_tabs"></marimo-cell>
+        <marimo-cell name="_tab_pulse"></marimo-cell>
+        <marimo-cell name="_tab_hist"></marimo-cell>
+        <marimo-cell name="_tab_state"></marimo-cell>
+        <marimo-cell name="_tab_change"></marimo-cell>
+        <marimo-cell name="_tab_coverage"></marimo-cell>
+        <marimo-cell name="_tab_about"></marimo-cell>
+      </section>
+    </main>
+    <script type="module">
+      // Notebook iframes (the pydeck map in _tab_pulse) are marimo virtual
+      // files, and app.py wraps each one in <div data-iframe-src="./@file/…">.
+      // In a view, Studio's <base href> sends that relative URL into the view's
+      // artifact (a 404), and the Studio editor preview strips <iframe> from
+      // untrusted output altogether. Point each map at the signed route Studio
+      // serves marimo files from (the part of <base href> before the view), and
+      // re-create the iframe where it was stripped.
+      const studioRoot = document.baseURI.match(/^(.*\/)[^\/]+\/_marimo-studio\/artifacts\//)?.[1];
+
+      function restoreFrames() {
+        for (const holder of document.querySelectorAll("[data-iframe-src]")) {
+          const src = holder.dataset.iframeSrc ?? "";
+          if (!studioRoot || !src.startsWith("./@file/")) continue;
+          const url = new URL(src.slice(2), studioRoot).href;
+          let frame = holder.querySelector("iframe");
+          if (!frame) {
+            frame = document.createElement("iframe");
+            frame.title = "Map";
+            frame.style.cssText = "display: block; width: 100%; border: 0;";
+            frame.style.height = holder.dataset.iframeHeight ?? "560px";
+            holder.append(frame);
+          }
+          if (frame.src !== url) frame.src = url;
+        }
+      }
+
+      restoreFrames();
+      new MutationObserver(restoreFrames).observe(document.getElementById("app-shell"), {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        attributeFilter: ["src", "data-iframe-src"],
+      });
+    </script>
+  </body>
+</html>

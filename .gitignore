@@ -28,3 +28,16 @@ data/full/
 .DS_Store
 .idea/
 .vscode/
+
+# The DuckDB file is built from the sample Parquet (scripts/build_database.py);
+# the negation above would otherwise re-include it.
+data/sample/*.duckdb
+data/sample/*.duckdb.wal
+
+# River Pulse map layers, derived on first run (raw downloads live in .cache/),
+# plus the build's lock file and staging directory.
+data/sample/pulse/
+data/sample/.pulse*
+
+# marimo session snapshots.
+__marimo__/
