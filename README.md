@@ -7,32 +7,78 @@ sdk: docker
 app_port: 7860
 pinned: false
 license: mit
+short_description: A national river observatory built on USGS data
 ---
 
-# 🌊 When Rivers Speak — A National River Observatory
+# 🌊 When Rivers Speak: A National River Observatory
 
 > Rivers are dynamic systems, but public dashboards often show them as isolated
 > gauges, static charts, or emergency-only alerts. **When Rivers Speak** turns
 > USGS water data into an interactive national observatory for exploring river
 > behavior across space and time.
 
-An interactive [marimo](https://marimo.io) dashboard that fetches, processes,
-stores, analyzes, and visualizes U.S. river data from the U.S. Geological
-Survey. It combines historical time series, latest observations, anomaly
-detection, and high-performance mapping so you can explore how rivers change
-across states, seasons, and hydrologic conditions.
+**Try it live:**
 
-**This is a situational-awareness and exploratory data tool. It is _not_ a
-flood-prediction system and carries no emergency reliability guarantees.**
+- 🗺️ **[River Pulse map](https://rodrigosf672-when-rivers-speak.hf.space/pulse/)**: every gauged river in the U.S., animated day by day since 2021
+- 📊 **[Dashboard](https://rodrigosf672-when-rivers-speak.hf.space/)**: filter, compare, and dig into ~26,000 USGS monitoring sites
+- 🤗 [Hugging Face Space](https://huggingface.co/spaces/rodrigosf672/when-rivers-speak) · 📚 [Docs](docs/)
+
+[![River Pulse map](assets/screenshots/river_pulse_map.jpg)](https://rodrigosf672-when-rivers-speak.hf.space/pulse/)
+
+Built with [marimo](https://marimo.io), DuckDB, and Parquet. One notebook
+(`app.py`) serves two views: an analytical dashboard and an animated 3D map.
+
+> **This is a situational-awareness and exploratory data tool. It is _not_ a
+> flood-prediction system and carries no emergency reliability guarantees.**
 
 ---
 
-## Live demo
+## Why this exists
 
-- **App (Hugging Face Spaces):** `https://huggingface.co/spaces/rodrigosf672/when-rivers-speak`
-- **Docs:** [`docs/`](docs/)
+Most public river data lives behind one-gauge-at-a-time pages or emergency
+alerting systems. Neither makes it easy to ask exploratory questions: *which
+rivers are unusually low for this time of year? which states carry the heaviest
+anomaly burden right now? where is monitoring dense, and where is it thin?* This
+project brings the national picture into one fast, widget-driven view so those
+questions are a click away.
 
-## Screenshots
+## Two ways to explore
+
+### River Pulse map (`/pulse/`)
+
+A three.js map of the lower 48, Alaska, and Hawaii, with every river coloured
+by how its flow compares with normal, from ⅛× (brown) to 8× (blue). Press play
+to watch six years of droughts and floods move across the country.
+
+- **Two baselines:** compare each river with its own median over the record,
+  or with what is normal for that time of year.
+- **Discharge to the sea:** a running national total across every U.S.
+  river outlet to the sea, with the share of gauges running high or low each
+  day.
+- **Controls:** space to play or pause, drag the timeline to jump to a date,
+  drag to pan, right-drag to tilt, scroll to zoom, `R` to reset.
+
+Rivers between gauges take the colour of the closest gauge along the river
+network, preferring rivers of similar size, up to about 600 km away. The map
+shows the overall pattern, not a measurement on every reach.
+
+### Dashboard (`/`)
+
+Six sections driven by shared filters (states, parameter, map layer, minimum
+anomaly score):
+
+1. **National River Pulse:** a U.S. map of latest conditions coloured by
+   anomaly level, summary cards, and the most anomalous sites.
+2. **Historical Explorer:** per-site time series with rolling 7/30-day means,
+   a day-of-year seasonal-normal band, and anomaly markers.
+3. **State Comparison:** anomaly burden ranking, score distributions, and a
+   sortable state table.
+4. **River Change Detector:** top sudden rises and drops, plus a volatility
+   ranking.
+5. **Data Coverage Observatory:** site counts, record longevity, and
+   completeness by state and parameter.
+6. **About the Data:** sources, the anomaly-score definition, update cadence,
+   and limitations.
 
 | National River Pulse | Historical Explorer |
 |---|---|
@@ -42,49 +88,54 @@ flood-prediction system and carries no emergency reliability guarantees.**
 |---|---|
 | ![State ranking](assets/screenshots/chart_state_ranking.png) | ![Anomaly components](assets/screenshots/metrics_validation.png) |
 
-*(Static previews rendered from the bundled sample dataset. The live app maps
-are interactive deck.gl layers.)*
+*(Static previews rendered from the bundled sample dataset. The live maps are
+interactive deck.gl layers.)*
 
-## Why this exists
+## Quickstart
 
-Most public river data lives behind one-gauge-at-a-time pages or emergency
-alerting systems. Neither makes it easy to ask exploratory questions — *which
-rivers are unusually low for this time of year? which states carry the heaviest
-anomaly burden right now? where is monitoring dense, and where is it thin?* This
-project brings the national picture into one fast, widget-driven view so those
-questions are a click away.
+```bash
+git clone https://github.com/rodrigosf672/when-rivers-speak.git
+cd when-rivers-speak
+pip install -e .
 
-## What the dashboard shows
+python scripts/build_database.py   # build DuckDB from the bundled sample
+python scripts/build_pulse_assets.py   # optional: prebuild the map layers
+marimo run app.py
+```
 
-Six tabs, all driven by shared filters (state, parameter, date range, anomaly
-threshold, map layer):
+Open the printed URL for the dashboard, and add `/pulse/` for the map. The app
+starts in **demo mode** with the bundled sample (all 50 states + DC, six
+parameters, 2021 to present).
 
-1. **National River Pulse** — a U.S. map of latest river conditions colored by
-   anomaly level, summary cards, and the most anomalous sites.
-2. **Historical Explorer** — per-site time series with rolling 7/30-day means,
-   a day-of-year seasonal-normal band, and anomaly markers.
-3. **State Comparison** — anomaly burden ranking, score distributions, and a
-   sortable state table.
-4. **River Change Detector** — top sudden rises and drops, plus a volatility
-   ranking.
-5. **Data Coverage Observatory** — site counts, record longevity, and
-   completeness by state and parameter.
-6. **About the Data** — sources, the anomaly-score definition, update cadence,
-   and limitations.
+The first time the map runs it downloads about 110 MB of public geography into
+`.cache/pulse/` and derives the map layers (about 30 seconds on a laptop). The
+prebuild step above does this ahead of time; otherwise the app does it on
+first load. Later runs reuse the layers.
+
+To edit the notebook instead of serving it, use `marimo edit app.py`.
 
 ## Data sources
 
-All data comes from the **U.S. Geological Survey (USGS) Water Services API**
+**River data:** the **U.S. Geological Survey (USGS) Water Services API**
 (`waterservices.usgs.gov`): the Site, Daily Values, and Instantaneous Values
 services. USGS water data are in the public domain. This project is independent
 and not affiliated with or endorsed by the USGS.
 
-Parameters in the bundled dataset (all nationwide, 2021–present): **discharge /
-streamflow**, **gage height**, **water temperature**, **specific conductance**,
-**dissolved oxygen**, and **pH**. Streamflow and gage height have the densest
-coverage; the four water-quality parameters are reported at progressively fewer
-gauges (water temperature at ~2,300 sites down to pH). Turbidity is registered in
-the pipeline and can be added the same way.
+Parameters in the bundled dataset (all nationwide, 2021 to present):
+**discharge / streamflow**, **gage height**, **water temperature**, **specific
+conductance**, **dissolved oxygen**, and **pH**. Streamflow and gage height have
+the densest coverage; the four water-quality parameters are reported at
+progressively fewer gauges (water temperature at ~2,300 sites, pH at the
+fewest). Turbidity is registered in the pipeline and can be added the same way.
+
+**Map geography** (River Pulse only, downloaded on first run):
+
+- River network: [HydroRIVERS v1.0](https://www.hydrosheds.org/products/hydrorivers)
+  (Lehner & Grill 2013), North America and Arctic. Hawaii's streams are traced
+  from terrain.
+- Terrain: [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/)
+  (Mapzen, USGS, SRTM, ETOPO1).
+- U.S. outline: Census cartographic boundary files. Lakes: Natural Earth.
 
 ## Architecture
 
@@ -98,21 +149,31 @@ queries and gets back only what a widget selection needs. See
 [`docs/architecture.md`](docs/architecture.md) and
 [`docs/data_dictionary.md`](docs/data_dictionary.md).
 
-## Quickstart
+### How the two views fit together
 
-```bash
-git clone https://github.com/rodrigosf672/when-rivers-speak.git
-cd when-rivers-speak
-pip install -e .
+Both views run on the same notebook through
+[marimo-studio](https://marimo-team.github.io/marimo-studio/):
 
-# The repo ships a small sample dataset. Build the database and run the app:
-python scripts/build_database.py
-marimo run app.py
-```
+| URL | View | Source |
+|---|---|---|
+| `/` | `original`: the dashboard, every displayed cell in order | `studio/original/` |
+| `/pulse/` | `pulse`: the 3D map (Svelte + three.js) | `studio/pulse/` |
 
-Open the printed URL. The app starts in **demo mode** using the bundled sample.
+The map reads a small "River Pulse" section at the end of `app.py`, whose data
+prep lives in `rivers/pulse/`: terrain, the HydroRIVERS network, gauges snapped
+to nearby river reaches, and daily flow codes for the last six calendar years.
+The derived layers go to `$RIVERS_DATA_DIR/pulse/` (gitignored). Rebuild them
+with `python scripts/build_pulse_assets.py --force`.
 
-## Fetching data
+Notes for contributors:
+
+- marimo-studio requires **marimo 0.25.0 exactly**, so both are pinned in
+  `pyproject.toml`.
+- Svelte views are built with the Deno that ships with `marimo-studio[deno]`.
+- [`studio/pulse/AGENTS.md`](studio/pulse/AGENTS.md) documents how data travels
+  from the notebook to the map.
+
+## Fetching more data
 
 ```bash
 # Quick subset for local iteration (a few minutes):
@@ -138,73 +199,48 @@ python scripts/build_database.py
 Fetches are chunked per state / parameter / year and cached, so runs are
 resumable and incremental.
 
-## Running locally
-
-```bash
-marimo run app.py        # served, read-only app (as deployed)
-marimo edit app.py       # interactive notebook editor
-```
-
 Environment variables:
 
 | Variable            | Default        | Meaning |
 |---------------------|----------------|---------|
 | `RIVERS_DATA_MODE`  | `demo`         | `demo` (bundled sample) or `full` |
-| `RIVERS_DATA_DIR`   | `data/sample`  | base dir holding `parquet/` and `rivers.duckdb` |
-| `RIVERS_CACHE_DIR`  | `.cache`       | raw HTTP response cache |
-
-## Studio views: the dashboard and the River Pulse map
-
-`app.py` is served through [marimo-studio](https://marimo-team.github.io/marimo-studio/)
-views of the same notebook:
-
-| URL | View | Source |
-|---|---|---|
-| `/` | **original** — the dashboard above, every displayed cell in order | `studio/original/` |
-| `/pulse/` | **pulse** — a three.js map of every gauged river in the lower 48, Alaska and Hawaii, animated day by day and coloured by flow vs normal | `studio/pulse/` (Svelte) |
-
-```bash
-marimo run app.py        # serves / and /pulse/
-marimo edit app.py       # notebook editor; Studio authoring at /studio/pulse/
-```
-
-The pulse view reads a small "River Pulse" section at the end of `app.py`.
-Its data prep lives in `rivers/pulse/`: terrain, the HydroRIVERS network
-(Hawaii traced from terrain), gauges snapped to reaches, and daily flow codes.
-On first run it downloads about 110 MB of public geography into `.cache/pulse/`
-and derives the map layers into `$RIVERS_DATA_DIR/pulse/` (`data/sample/pulse/`
-in demo mode; both gitignored). Later runs reuse them. The map animates the
-last six calendar years of daily discharge. The sources are HydroRIVERS (North America and Arctic), AWS
-Terrain Tiles, the Census US outline and Natural Earth lakes. To prebuild or
-refresh:
-
-```bash
-python scripts/build_pulse_assets.py [--force]
-```
-
-Studio requires marimo 0.25.0 exactly, so the two are pinned together in
-`pyproject.toml`. Svelte views are built with the Deno that ships with
-`marimo-studio[deno]`. `studio/pulse/AGENTS.md` records how data travels from
-the notebook to the view.
+| `RIVERS_DATA_DIR`   | `data/sample`  | base dir holding `parquet/`, `rivers.duckdb`, and the map layers |
+| `RIVERS_CACHE_DIR`  | `.cache`       | raw HTTP response cache, including the map's geography downloads |
 
 ## Deploying to Hugging Face Spaces
 
-The repo is a ready-to-deploy **Docker Space**.
+The repo is a ready-to-deploy **Docker Space**: the YAML front matter at the
+top of this README configures it, and the `Dockerfile` serves the app on port
+7860. While building the image, it:
 
-1. Create a new Space (SDK: **Docker**).
-2. Push this repo to it (the YAML front matter at the top of this README
-   configures the Space; `app_port: 7860` matches the `Dockerfile`).
+- builds the DuckDB from the bundled sample,
+- prebuilds the River Pulse map layers and both Studio views, so visitors never
+  wait for them,
+- switches to user 1000, which Hugging Face uses to run the container.
 
-   ```bash
-   git remote add space https://huggingface.co/spaces/rodrigosf672/when-rivers-speak
-   git push space main
-   ```
-3. The Space builds the image, builds the DuckDB from the bundled sample, and
-   serves the app on port 7860.
+**Automatic deploys:** the [`deploy-notes.yml`](.github/workflows/deploy-notes.yml)
+workflow uploads the repo to the Space on every push to `main`. Set it up once:
 
-Optional: the [`deploy-notes.yml`](.github/workflows/deploy-notes.yml) workflow
-mirrors the repo to the Space on every push to `main` when you set an `HF_TOKEN`
-secret and an `HF_SPACE` variable. See [`docs/deployment.md`](docs/deployment.md).
+```bash
+gh secret set HF_TOKEN            # a Hugging Face token with write access to the Space
+gh variable set HF_SPACE -b rodrigosf672/when-rivers-speak
+```
+
+Without those two settings the workflow skips the deploy. To deploy by hand,
+run the same upload the workflow does:
+
+```python
+from huggingface_hub import HfApi
+
+HfApi().upload_folder(
+    folder_path=".",
+    repo_id="rodrigosf672/when-rivers-speak",
+    repo_type="space",
+    ignore_patterns=[".git*", "data/full/*", "*.duckdb", ".cache/*"],
+)
+```
+
+See [`docs/deployment.md`](docs/deployment.md) for more.
 
 ## Limitations
 
@@ -212,21 +248,29 @@ secret and an `HF_SPACE` variable. See [`docs/deployment.md`](docs/deployment.md
 - USGS values are **provisional** until reviewed and may be revised.
 - Coverage varies widely by state, parameter, and era; gaps are common.
 - The anomaly score is a **heuristic** for exploration, not a calibrated alert.
+- On the River Pulse map, most river reaches are coloured by a nearby gauge,
+  not measured directly.
 - The bundled dataset covers all 50 states + DC (~26,000 sites, six parameters,
-  2021–present); deeper multi-decade history is available via full mode.
+  2021 to present); deeper multi-decade history is available via full mode.
 
 ## Roadmap
 
 See [`docs/roadmap.md`](docs/roadmap.md). Highlights: more parameters lit up in
-the UI, a river-network layer, Hugging Face Datasets for larger stores, and an
-optional static WASM demo on GitHub Pages.
+the UI, Hugging Face Datasets for larger stores, and an optional static WASM
+demo on GitHub Pages.
 
-## Citation / acknowledgement
+## Credits
 
-Data courtesy of the **U.S. Geological Survey**, National Water Information
-System (NWIS), retrieved via USGS Water Services. If you use this project,
-please cite USGS as the data source and link back to this repository.
+- River data courtesy of the **U.S. Geological Survey**, National Water
+  Information System (NWIS), retrieved via USGS Water Services. If you use this
+  project, please cite USGS as the data source and link back to this repository.
+- The River Pulse map was contributed by
+  [Konstantin Taletskiy](https://github.com/ktaletsk) in
+  [#1](https://github.com/rodrigosf672/when-rivers-speak/pull/1).
+- Map geography: HydroRIVERS (Lehner, B., Grill G. 2013, *Hydrological
+  Processes* 27(15)), AWS Terrain Tiles, U.S. Census Bureau, and Natural Earth.
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE). USGS data are in the public domain.
+MIT, see [`LICENSE`](LICENSE). USGS data are in the public domain. The map's
+geography sources keep their own terms.
