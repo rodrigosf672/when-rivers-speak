@@ -22,9 +22,13 @@ short_description: A national river observatory built on USGS data
 - 🗺️ **[River Pulse map](https://rodrigosf672-when-rivers-speak.hf.space/pulse/)**: every gauged river in the U.S., animated day by day since 2021
 - 📊 **[Dashboard](https://rodrigosf672-when-rivers-speak.hf.space/)**: filter, compare, and dig into ~26,000 USGS monitoring sites
 - 🤗 [Hugging Face Space](https://huggingface.co/spaces/rodrigosf672/when-rivers-speak) · 📚 [Docs](docs/)
-- 🎤 [PyBay 2026 talk: Building Scientific Observatories](docs/talks/pybay-2026-building-scientific-observatories.html) (slides, download and open in a browser)
+- 🎤 [PyBay 2026 talk: Building Scientific Observatories](https://rodrigosf672.github.io/when-rivers-speak/talks/pybay-2026-building-scientific-observatories.html) (slides)
 
 [![River Pulse map](assets/screenshots/river_pulse_map.jpg)](https://rodrigosf672-when-rivers-speak.hf.space/pulse/)
+
+**PyBay 2026 talk:** click the slide to open the full deck.
+
+[![Building Scientific Observatories with Python, PyBay 2026](assets/talks/pybay-2026-cover.jpg)](https://rodrigosf672.github.io/when-rivers-speak/talks/pybay-2026-building-scientific-observatories.html)
 
 Built with [marimo](https://marimo.io), DuckDB, and Parquet. One notebook
 (`app.py`) serves two views: an analytical dashboard and an animated 3D map.
