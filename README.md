@@ -22,6 +22,7 @@ short_description: A national river observatory built on USGS data
 - 🗺️ **[River Pulse map](https://rodrigosf672-when-rivers-speak.hf.space/pulse/)**: every gauged river in the U.S., animated day by day since 2021
 - 📊 **[Dashboard](https://rodrigosf672-when-rivers-speak.hf.space/)**: filter, compare, and dig into ~26,000 USGS monitoring sites
 - 🤗 [Hugging Face Space](https://huggingface.co/spaces/rodrigosf672/when-rivers-speak) · 📚 [Docs](docs/)
+- 🎤 [PyBay 2026 talk: Building Scientific Observatories](docs/talks/pybay-2026-building-scientific-observatories.html) (slides, download and open in a browser)
 
 [![River Pulse map](assets/screenshots/river_pulse_map.jpg)](https://rodrigosf672-when-rivers-speak.hf.space/pulse/)
 
